@@ -214,9 +214,32 @@ Function Get-ExtensionConfig {
             }
 
             if($Libraries.Count -gt 0) {
-                $phpSeries = Get-File -Url "https://downloads.php.net/~windows/php-sdk/deps/$VsVersion/$Arch"
-                $extensionSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps"
-                $extensionArchivesSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps/archives"
+                # Directory listings on downloads.php.net may be forbidden (403), so
+                # tolerate failures and fall back to the series manifest, which lists
+                # the same library archives.
+                $emptyListing = [pscustomobject]@{ Content = '' }
+                $phpSeries = $emptyListing
+                $extensionSeries = $emptyListing
+                $extensionArchivesSeries = $emptyListing
+                try {
+                    $phpSeries = Get-File -Url "https://downloads.php.net/~windows/php-sdk/deps/$VsVersion/$Arch"
+                } catch {
+                    try {
+                        $phpSeries = Get-File -Url "https://downloads.php.net/~windows/php-sdk/deps/series/packages-$PhpVersion-$VsVersion-$Arch-stable.txt"
+                    } catch {
+                        # Library detection is limited to what the series manifest lists.
+                    }
+                }
+                try {
+                    $extensionSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps"
+                } catch {
+                    # PECL library detection is unavailable without the listing.
+                }
+                try {
+                    $extensionArchivesSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps/archives"
+                } catch {
+                    # PECL library detection is unavailable without the listing.
+                }
             }
             $thirdPartyLibraries = @("boost", "instantclient", "odbc_cli")
             $Libraries | Select-Object -Unique | ForEach-Object {
